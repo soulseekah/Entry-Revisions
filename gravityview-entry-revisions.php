@@ -57,15 +57,24 @@ class GV_Entry_Revisions {
 	 */
 	private function add_hooks() {
 
-		// We only run on the entry detail page
-		if( 'entry_detail' !== GFForms::get_page() ) {
-			return;
-		}
-
 		add_action( 'gform_after_update_entry', array( $this, 'save' ), 10, 3 );
 
+		// We only run the rest of the hooks on the entry detail page
+		if( 'entry_detail' === GFForms::get_page() ) {
+			$this->add_entry_detail_hooks();
+		}
+	}
+
+	/**
+	 * Hooks only run on the Entry Detail page in WP Admin
+	 *
+	 * @since 1.0
+	 *
+	 * @return void
+	 */
+	private function add_entry_detail_hooks() {
 		add_filter( 'gform_entry_detail_meta_boxes', array( $this, 'add_meta_box' ) );
-		
+
 		add_action( 'admin_init', array( $this, 'restore' ) );
 
 		// If showing a revision, get rid of all metaboxes and lingering HTML stuff
