@@ -497,13 +497,7 @@ class GV_Entry_Revisions {
 	 * @return void
 	 */
 	public function meta_box_restore_revision( $data = array() ) {
-
-		$mode = rgar( $data, 'mode' );
-
-		if( 'view' !== $mode ) {
-			return;
-		}
-
+		
 		$entry = rgar( $data, 'entry' );
 		$form = rgar( $data, 'form' );
 		$revision = $this->get_revision( $entry['id'], rgget( 'revision' ) );
@@ -642,12 +636,6 @@ class GV_Entry_Revisions {
 	 * @return void
 	 */
 	public function meta_box_entry_revisions( $data ) {
-
-		$mode = rgar( $data, 'mode' );
-
-		if( 'view' !== $mode ) {
-			return;
-		}
 
 		$entry_id = rgars( $data, 'entry/id' );
 		$entry = rgar( $data, 'entry' );
