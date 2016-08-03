@@ -147,6 +147,7 @@ class GV_Entry_Revisions {
 
 		// Nothing changed
 		if( empty( $changed_fields ) ) {
+			GFCommon::log_debug( __METHOD__ .': Not adding revision; no fields changed.' );
 			return false;
 		}
 
