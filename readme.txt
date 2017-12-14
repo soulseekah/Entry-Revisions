@@ -15,6 +15,11 @@ Track changes to Gravity Forms entries and restore from previous revisions. Requ
 3. Edit entries in Gravity Forms as normal
 4. You'll see a "Revisions" meta box on the entries page. Click the link next to the revision to compare versions, and restore.
 
+== Filters ==
+
+- `gv-entry-revisions/delete-after-restore` boolean Should the revision be removed after it has been restored? Default: `false`
+- `gv-entry-revisions/restore-entry-meta` boolean Whether to restore entry meta as well as field values. Default: false
+
 == Changelog ==
 
 = 1.0 =

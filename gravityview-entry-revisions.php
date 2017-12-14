@@ -648,31 +648,74 @@ class GV_Entry_Revisions {
 	public function meta_box_entry_revisions( $data ) {
 
 		$entry_id = rgars( $data, 'entry/id' );
-		$entry = rgar( $data, 'entry' );
-		$form = rgar( $data, 'form' );
-		$revisions = $this->get_revisions( $entry_id );
 
-		if( empty( $revisions ) ) {
-			echo wpautop( esc_html__( 'This entry has no revisions.', 'gv-entry-revisions' ) );
-			return;
-		}
-
-		$rows = '';
-		foreach ( $revisions as $revision ) {
-			$diffs = $this->get_diff( $revision, $entry, $form );
-
-			// Only show if there are differences
-			if( ! empty( $diffs ) ) {
-				$rows .= "\t<li>" . $this->revision_title( $revision ) . "</li>\n";
-			}
-		}
-
-		echo "<div class='hide-if-js'><p>" . __( 'JavaScript must be enabled to use this feature.', 'gv-entry-revisions' ) . "</p></div>\n";
-
-		echo "<ul class='post-revisions hide-if-no-js'>\n";
-		echo $rows;
-		echo "</ul>";
+		echo $this->get_entry_revisions( $entry_id, array( 'container_css' =>  'post-revisions' ) );
 	}
+
+	/**
+     * Render the entry revisions
+     *
+     * @since 1.1
+     *
+	 * @param int $entry_id
+	 * @param array $entry
+	 * @param array $form
+	 */
+	public function get_entry_revisions( $entry_id = 0, $atts = array() ) {
+
+	    $output = '';
+
+
+	    $atts = wp_parse_args( $atts, array(
+	       'container_css' => 'gv-entry-revisions',
+           'wpautop'       => 1,
+           'strings'       => array(
+	           'no_revisions' => __( 'This entry has no revisions.', 'gv-entry-revisions' ),
+           )
+        ));
+
+		$entry = GFAPI::get_entry( $entry_id );
+
+	    if ( ! $entry || is_wp_error( $entry ) ) {
+
+		    $output = esc_html( $atts['strings']['not_found'] );
+
+	    } else {
+
+		    $form = GFAPI::get_form( $entry['form_id'] );
+
+		    $revisions     = $this->get_revisions( $entry_id );
+		    $container_css = esc_attr( $atts['container_css'] );
+
+		    if ( empty( $revisions ) ) {
+			    $output = esc_html( $atts['strings']['no_revisions'] );
+		    } else {
+
+			    $rows = '';
+			    foreach ( $revisions as $revision ) {
+				    $diffs = $this->get_diff( $revision, $entry, $form );
+
+				    // Only show if there are differences
+				    if ( ! empty( $diffs ) ) {
+					    $rows .= "\t<li>" . $this->revision_title( $revision ) . "</li>\n";
+				    }
+			    }
+
+			    $output = "<ul class='{$container_css}'>\n" . $rows . "</ul>";
+		    }
+	    }
+
+		if ( $atts['wpautop'] ) {
+			$output = wpautop( $output );
+		}
+
+		/**
+		 * Modify the output of the revisions
+		 */
+		$output = apply_filters( 'gv-entry-revisions/output', $output, $entry );
+
+		return $output;
+    }
 }
 
 add_action( 'gform_loaded', array( 'GV_Entry_Revisions', 'load' ) );
