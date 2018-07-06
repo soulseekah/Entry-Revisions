@@ -24,13 +24,7 @@ class GV_Entry_Revisions {
 	 * @see gform_update_meta()
 	 * @see gform_get_meta()
 	 */
-	private static $meta_key = 'gv_revisions';
-
-	/**
-	 * @var string The name of the meta key used to store revision details in the entry array
-	 * @since 1.0
-	 */
-	private static $entry_key = 'gv_revision';
+	private static $meta_key = 'gv_revision_details';
 
 	/**
 	 * Instantiate the class
@@ -59,11 +53,62 @@ class GV_Entry_Revisions {
 
 		add_action( 'gform_after_update_entry', array( $this, 'save' ), 10, 3 );
 
+		add_filter( 'gform_entry_meta', array( $this, 'modify_gform_entry_meta' ) );
+
 		// We only run the rest of the hooks on the entry detail page
 		if( 'entry_detail' === GFForms::get_page() ) {
 			$this->add_entry_detail_hooks();
 		}
 	}
+
+	/**
+     * Returns the additional entry meta details added by this plugin
+     *
+	 * @return array
+	 */
+	private function get_entry_meta() {
+
+		$meta = array(
+			'gv_revision_parent_id' => array(
+				'label'             => __( 'Revision Parent Entry ID' ),
+				'is_numeric'        => true,
+				'is_default_column' => false,
+			),
+			'gv_revision_date' => array(
+				'label'             => __( 'Revision Parent Date' ),
+				'is_numeric'        => true,
+				'is_default_column' => false,
+			),
+			'gv_revision_date_gmt' => array(
+				'label'             => __( 'Revision Date (GMT)' ),
+				'is_numeric'        => true,
+				'is_default_column' => false,
+			),
+			'gv_revision_user_id' => array(
+				'label'             => __( 'Revision Created By' ),
+				'is_numeric'        => true,
+				'is_default_column' => false,
+			),
+			'gv_revision_changed' => array(
+				'label'             => __( 'Revision Changed Content' ),
+				'is_numeric'        => false,
+				'is_default_column' => false,
+			)
+		);
+
+		return $meta;
+	}
+
+	/**
+     * Updates Gravity Forms to fetch revisions with other entry details
+     *
+	 * @param array $meta
+	 *
+	 * @return array
+	 */
+	public function modify_gform_entry_meta( $meta = array() ) {
+		return $this->get_entry_meta() + $meta;
+    }
 
 	/**
 	 * Hooks only run on the Entry Detail page in WP Admin
@@ -132,10 +177,15 @@ class GV_Entry_Revisions {
 	 */
 	private function add_revision( $entry_or_entry_id = 0, $revision_to_add = array() ) {
 
+		$current_entry = $entry_or_entry_id;
+
 		if( ! is_array( $entry_or_entry_id ) && is_numeric( $entry_or_entry_id ) ) {
 			$current_entry = GFAPI::get_entry( $entry_or_entry_id );
-		} else {
-			$current_entry = $entry_or_entry_id;
+		}
+
+		if ( is_wp_error( $current_entry ) ) {
+			GFCommon::log_debug( __METHOD__ .': Entry not found at ID #' . $entry_or_entry_id );
+            return false;
 		}
 
 		if ( ! is_array( $current_entry ) ) {
@@ -151,29 +201,28 @@ class GV_Entry_Revisions {
 			return false;
 		}
 
-		$revisions = $this->get_revisions( $entry_or_entry_id );
+		$revision_to_add['status'] = 'gv-revision';
 
-		$revision_to_add[ self::$entry_key ] = array(
-			'date' => current_time( 'timestamp', 0 ),
-			'date_gmt' => current_time( 'timestamp', 1 ),
-			'user_id' => get_current_user_id(),
-			'changed' => $changed_fields,
+		$revision_id = GFAPI::add_entry( $revision_to_add );
+
+		$revision_meta = array(
+            'gv_revision_parent_id' => $current_entry['id'],
+			'gv_revision_date'      => current_time( 'timestamp', 0 ),
+			'gv_revision_date_gmt'  => current_time( 'timestamp', 1 ),
+			'gv_revision_user_id'   => get_current_user_id(),
+			'gv_revision_changed'   => $changed_fields,
 		);
 
-		if ( empty( $revisions ) ) {
-			$revisions = array( $revision_to_add );
-		} else {
-			$revisions[] = $revision_to_add;
+		foreach ( $revision_meta as $key => $value ) {
+			gform_update_meta( $revision_id, $key, $value );
 		}
-
-		gform_update_meta( $entry_or_entry_id, self::$meta_key, maybe_serialize( $revisions ) );
 
 		return true;
 	}
 
 
 	/**
-	 * Compares old entry array to new, return array of differences
+	 * Compares old entry array to new, return array of differences with the values of the new entry
 	 *
 	 * @param array $old
 	 * @param array $new
@@ -182,7 +231,7 @@ class GV_Entry_Revisions {
 	 */
 	private function get_modified_entry_fields( $old = array(), $new = array() ) {
 
-		$return = $old;
+		$return = $new;
 
 		foreach( $old as $key => $old_value ) {
 			// Gravity Forms itself uses == comparison
@@ -205,19 +254,19 @@ class GV_Entry_Revisions {
 	 */
 	public function get_revisions( $entry_id = 0 ) {
 
-		$return = array();
-		$revisions = gform_get_meta( $entry_id, self::$meta_key );
+		$search_criteria = array(
+			'field_filters' => array(
+				array(
+					'key' => 'gv_revision_parent_id',
+					'value' => $entry_id
+				),
+			)
+		);
 
-		if( $revisions ) {
-			$revisions = maybe_unserialize( $revisions );
+		// TODO: Add filter for page size
+		$revisions = GFAPI::get_entries( 0, $search_criteria, array(), array('offset' => 0, 'page_size' => 100 ) );
 
-			// Single meta? Make it an array
-			$return = isset( $revisions['id'] ) ? array( $revisions ) : $revisions;
-		}
-
-		krsort( $return );
-		
-		return $return;
+		return $revisions;
 	}
 
 	/**
@@ -259,50 +308,10 @@ class GV_Entry_Revisions {
 	 * @param int $entry_id
 	 * @param int $revision_id Revision GMT timestamp
 	 *
-	 * return void|false False if revision isn't found; true if gform_update_meta called.
+	 * return bool|WP_Error WP_Error if revision isn't found or submissions blocked; true if revision deleted
 	 */
 	private function delete_revision( $entry_id = 0, $revision_id = 0 ) {
-
-		$revisions = $this->get_revisions( $entry_id );
-
-		if( empty( $revisions ) ) {
-			return false;
-		}
-
-		foreach ( $revisions as $key => $revision ) {
-			if( intval( $revision_id ) === intval( $revision[self::$entry_key]['date_gmt'] ) ) {
-				unset( $revisions["{$key}"] );
-				break;
-			}
-		}
-
-		gform_update_meta( $entry_id, self::$meta_key, maybe_serialize( $revisions ) );
-
-		return true;
-	}
-
-	/**
-	 * Get a specific revision by the GMT timestamp
-	 *
-	 * @since 1.0
-	 *
-	 * @param int $entry_id
-	 * @param int $revision_id GMT timestamp of revision
-	 *
-	 * return array|false Array if found, false if not.
-	 */
-	private function get_revision( $entry_id = 0, $revision_id = 0 ) {
-
-		$revisions = $this->get_revisions( $entry_id );
-
-		foreach ( $revisions as $revision ) {
-
-			if( intval( $revision_id ) === intval( rgars( $revision, self::$entry_key . '/date_gmt' ) ) ) {
-				return $revision;
-			}
-		}
-
-		return false;
+		return GFAPI::delete_entry( $revision_id );
 	}
 
 	/**
@@ -315,10 +324,10 @@ class GV_Entry_Revisions {
 	 */
 	public function restore_revision( $entry_id = 0, $revision_id = 0 ) {
 
-		$revision = $this->get_revision( $entry_id, $revision_id );
+		$revision = GFAPI::get_entry( $revision_id );
 
 		// Revision has already been deleted or does not exist
-		if( empty( $revision ) ) {
+		if( empty( $revision ) || is_wp_error( $revision ) ) {
 			return new WP_Error( 'not_found', __( 'Revision not found', 'gv-entry-revisions' ), array( 'entry_id' => $entry_id, 'revision_id' => $revision_id ) );
 		}
 
@@ -344,8 +353,12 @@ class GV_Entry_Revisions {
 		remove_all_actions( 'gform_post_update_entry' );
 		remove_all_actions( sprintf( 'gform_post_update_entry_%s', $revision['form_id'] ) );
 
-		// Remove the entry key data
-		unset( $revision[ self::$entry_key ] );
+		$entry_meta = $this->get_entry_meta();
+
+		foreach( $entry_meta as $key => $value ) {
+			// Remove the entry key data
+			unset( $revision[ $key ] );
+		}
 
 		$updated_result = GFAPI::update_entry( $revision, $entry_id );
 
@@ -366,7 +379,7 @@ class GV_Entry_Revisions {
 			 * @param bool $remove_after_restore [Default: false]
 			 */
 			if( apply_filters( 'gv-entry-revisions/delete-after-restore', false ) ) {
-				$this->delete_revision( $entry_id, $revision_id );
+				return GFAPI::delete_entry( $revision_id );
 			}
 
 			return true;
@@ -459,10 +472,12 @@ class GV_Entry_Revisions {
 
 		$return = array();
 
+		$entry_meta = array_keys( $this->get_entry_meta() );
+
 		foreach ( $previous as $key => $previous_value ) {
 
 			// Don't compare `gv_revision` data
-			if( self::$entry_key === $key ) {
+			if( in_array( $key, $entry_meta ) ) {
 				continue;
 			}
 
@@ -510,7 +525,7 @@ class GV_Entry_Revisions {
 		
 		$entry = rgar( $data, 'entry' );
 		$form = rgar( $data, 'form' );
-		$revision = $this->get_revision( $entry['id'], rgget( 'revision' ) );
+		$revision = GFAPI::get_entry( rgget( 'revision') );
 
 		$diff_output = '';
 		$diffs = $this->get_diff( $revision, $entry, $form );
@@ -569,12 +584,12 @@ class GV_Entry_Revisions {
 	 * @since 1.0
 	 *
 	 * @param int $entry_id
-	 * @param int $revision_date_gmt
+	 * @param int $revision_id
 	 *
 	 * @return string
 	 */
-	private function generate_restore_nonce_action( $entry_id = 0, $revision_date_gmt = 0 ) {
-		return sprintf( 'gv-restore-entry-%d-revision-%d', intval( $entry_id ), intval( $revision_date_gmt ), 'gv-restore-entry' );
+	private function generate_restore_nonce_action( $entry_id = 0, $revision_id = 0 ) {
+		return sprintf( 'gv-restore-entry-%d-revision-%d', intval( $entry_id ), intval( $revision_id ), 'gv-restore-entry' );
 	}
 
 	/**
@@ -586,13 +601,9 @@ class GV_Entry_Revisions {
 	 */
 	private function get_restore_url( $revision = array() ) {
 
-		$nonce_action = $this->generate_restore_nonce_action( $revision['id'], $revision[ self::$entry_key ]['date_gmt'] );
+		$nonce_action = $this->generate_restore_nonce_action( $revision['gv_revision_parent_id'], $revision['id'] );
 
-		return wp_nonce_url( add_query_arg( array( 'restore' => $revision[ self::$entry_key ]['date_gmt'] ), remove_query_arg( 'revision' ) ), $nonce_action );
-	}
-
-	private function get_revision_details_link( $revision = array() ) {
-		return add_query_arg( array( 'revision' => $revision[ self::$entry_key ]['date_gmt'] ) );
+		return wp_nonce_url( add_query_arg( array( 'restore' => $revision['id'] ), remove_query_arg( 'revision' ) ), $nonce_action );
 	}
 
 	/**
@@ -610,18 +621,18 @@ class GV_Entry_Revisions {
 	 */
 	private function revision_title( $revision, $link = true, $format = '%1$s %2$s, %3$s ago (%4$s)' ) {
 
-		$revision_details = rgar( $revision, self::$entry_key );
-
-		$revision_user_id = rgar( $revision_details, 'user_id' );
+		$revision_user_id = rgar( $revision, 'gv_revision_user_id' );
 
 		$author = get_the_author_meta( 'display_name', $revision_user_id );
 		/* translators: revision date format, see http://php.net/date */
 		$datef = _x( 'F j, Y @ H:i:s', 'revision date format' );
 
 		$gravatar = get_avatar( $revision_user_id, 32 );
-		$date = date_i18n( $datef, $revision_details['date'] );
-		if ( $link ) { //&& current_user_can( 'edit_post', $revision->ID ) && $link = get_edit_post_link( $revision->ID ) )
-			$link = $this->get_revision_details_link( $revision );
+		$date = date_i18n( $datef, $revision['gv_revision_date'] );
+
+		// TODO: Permissions check
+		if ( $link ) {
+			$link = esc_url( add_query_arg( array( 'revision' => $revision['id'] ) ) );
 			$date = "<a href='$link'>$date</a>";
 		}
 
@@ -629,7 +640,7 @@ class GV_Entry_Revisions {
 			$format,
 			$gravatar,
 			$author,
-			human_time_diff( $revision_details['date_gmt'], current_time( 'timestamp', true ) ),
+			human_time_diff( $revision['gv_revision_date_gmt'], current_time( 'timestamp', true ) ),
 			$date
 		);
 
@@ -662,9 +673,6 @@ class GV_Entry_Revisions {
 	 * @param array $form
 	 */
 	public function get_entry_revisions( $entry_id = 0, $atts = array() ) {
-
-	    $output = '';
-
 
 	    $atts = wp_parse_args( $atts, array(
 	       'container_css' => 'gv-entry-revisions',
