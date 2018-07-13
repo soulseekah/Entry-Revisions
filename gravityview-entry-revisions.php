@@ -742,6 +742,7 @@ class GV_Entry_Revisions {
            'format'        => __( '%1$s %2$s, %3$s ago (%4$s)' ),
            'strings'       => array(
 	           'no_revisions' => __( 'This entry has no revisions.', 'gravityview-entry-revisions' ),
+	           'not_found'    => __( 'Revision not found', 'gravityview-entry-revisions' ),
            )
         ));
 
