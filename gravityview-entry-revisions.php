@@ -38,6 +38,13 @@ class GV_Entry_Revisions {
 	}
 
 	/**
+	 * Load translations!
+	 */
+	function load_textdomain() {
+        load_plugin_textdomain( 'gravityview-entry-revisions', false, dirname( plugin_basename(__FILE__) ) . '/languages' );
+	}
+
+	/**
 	 * GV_Entry_Revisions constructor.
 	 * @since 1.0
 	 */
@@ -755,4 +762,5 @@ class GV_Entry_Revisions {
     }
 }
 
+add_action( 'plugins_loaded', array( 'GV_Entry_Revisions', 'load_textdomain') );
 add_action( 'gform_loaded', array( 'GV_Entry_Revisions', 'load' ) );
