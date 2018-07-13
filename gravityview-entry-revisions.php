@@ -739,6 +739,7 @@ class GV_Entry_Revisions {
 	    $atts = wp_parse_args( $atts, array(
 	       'container_css' => 'gv-entry-revisions',
            'wpautop'       => 1,
+           'format'        => __( '%1$s %2$s, %3$s ago (%4$s)' ),
            'strings'       => array(
 	           'no_revisions' => __( 'This entry has no revisions.', 'gravityview-entry-revisions' ),
            )
@@ -767,7 +768,7 @@ class GV_Entry_Revisions {
 
 				    // Only show if there are differences
 				    if ( ! empty( $diffs ) ) {
-					    $rows .= "\t<li>" . $this->revision_title( $revision ) . "</li>\n";
+					    $rows .= "\t<li>" . $this->revision_title( $revision, true, $atts['format'] ) . "</li>\n";
 				    }
 			    }
 
