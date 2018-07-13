@@ -669,6 +669,27 @@ class GV_Entry_Revisions {
 	}
 
 	/**
+	 * Generate a nonce action to secure the revision diff process
+	 *
+	 * @since 1.0
+	 *
+	 * @param int $entry_id
+	 * @param int $revision_id
+	 *
+	 * @return string
+	 */
+	private function generate_revision_diff_nonce_action( $entry_id = 0, $revision_id = 0 ) {
+		return sprintf( 'gv-restore-entry-%d-revision-%d', intval( $entry_id ), intval( $revision_id ), 'gv-revision-diff' );
+	}
+
+	private function get_revision_diff_url( $revision = array() ) {
+
+		$nonce_action = $this->generate_revision_diff_nonce_action( $revision['gv_revision_parent_id'], $revision['id'] );
+
+		return wp_nonce_url( add_query_arg( array( 'revision' => $revision['id'], 'lid' => $revision['gv_revision_parent_id'] ) ), $nonce_action );
+    }
+
+	/**
 	 * Retrieve formatted date timestamp of a revision (linked to that revision details page).
 	 *
 	 * @since 1.0
@@ -694,7 +715,8 @@ class GV_Entry_Revisions {
 
 		// TODO: Permissions check
 		if ( $link ) {
-			$link = esc_url( add_query_arg( array( 'revision' => $revision['id'] ) ) );
+
+		    $link = esc_url( $this->get_revision_diff_url( $revision ) );
 			$date = "<a href='$link'>$date</a>";
 		}
 
