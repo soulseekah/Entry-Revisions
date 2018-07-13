@@ -227,6 +227,8 @@ class GV_Entry_Revisions {
 			gform_update_meta( $revision_id, $key, $value );
 		}
 
+		GFAPI::update_entry_property( $current_entry['id'], 'date_updated', gmdate( 'Y-m-d H:i:s' ) );
+
 		return true;
 	}
 
