@@ -324,6 +324,8 @@ class GV_Entry_Revisions {
 	 * @since 1.0
 	 *
 	 * @param int $entry_id ID of the entry to remove revsions
+     *
+     * @return array $deleted Keys are entry IDs; value is 1 if deleted, WP_Error if not
 	 */
 	private function delete_revisions( $entry_id = 0 ) {
 
@@ -437,34 +439,35 @@ class GV_Entry_Revisions {
 	 *
 	 * @return void Redirects to single entry view after completion
 	 */
-	public function restore() {
+	public function admin_init_restore_listener() {
 
-		if( rgget('restore') && rgget('view') && rgget( 'lid' ) ) {
-
-			// No access!
-			if( ! GFCommon::current_user_can_any( 'gravityforms_edit_entries' ) ) {
-				GFCommon::log_error( 'Restoring the entry revision failed: user does not have the "gravityforms_edit_entries" capability.' );
-				return;
-			}
-
-			$revision_id = rgget( 'restore' );
-			$entry_id = rgget( 'lid' );
-			$nonce = rgget( '_wpnonce' );
-			$nonce_action = $this->generate_restore_nonce_action( $entry_id, $revision_id );
-			$valid = wp_verify_nonce( $nonce, $nonce_action );
-
-			// Nonce didn't validate
-			if( ! $valid ) {
-				GFCommon::log_error( 'Restoring the entry revision failed: nonce validation failed.' );
-				return;
-			}
-
-			// Handle restoring the entry
-			$this->restore_revision( $entry_id, $revision_id );
-
-			wp_safe_redirect( remove_query_arg( 'restore' ) );
-			exit();
+		if( ! rgget('restore') || ! rgget('view') || ! rgget( 'lid' ) ) {
+			return;
 		}
+
+        // No access!
+        if( ! GFCommon::current_user_can_any( 'gravityforms_edit_entries' ) ) {
+            GFCommon::log_error( 'Restoring the entry revision failed: user does not have the "gravityforms_edit_entries" capability.' );
+            return;
+        }
+
+        $revision_id = rgget( 'restore' );
+        $entry_id = rgget( 'lid' );
+        $nonce = rgget( '_wpnonce' );
+        $nonce_action = $this->generate_restore_nonce_action( $entry_id, $revision_id );
+        $valid = wp_verify_nonce( $nonce, $nonce_action );
+
+        // Nonce didn't validate
+        if( ! $valid ) {
+            GFCommon::log_error( 'Restoring the entry revision failed: nonce validation failed.' );
+            return;
+        }
+
+        // Handle restoring the entry
+        $this->restore_revision( $entry_id, $revision_id );
+
+        wp_safe_redirect( remove_query_arg( 'restore' ) );
+        exit();
 	}
 
 	/**
