@@ -6,7 +6,7 @@
  * Version:          	1.0
  * Author:            	GravityView
  * Author URI:        	https://gravityview.co
- * Text Domain:       	gv-entry-revisions
+ * Text Domain:       	gravityview-entry-revisions
  * License:           	GPLv2 or later
  * License URI: 		http://www.gnu.org/licenses/gpl-2.0.html
  * Domain Path:			/languages
@@ -31,9 +31,9 @@ class GV_Entry_Revisions {
 	 * @since 1.0
 	 */
 	public static function load() {
-		if( ! did_action( 'gv_entry_versions_loaded' ) ) {
+		if( ! did_action( 'gv_entry_revisions_loaded' ) ) {
 			new self;
-			do_action( 'gv_entry_versions_loaded' );
+			do_action( 'gv_entry_revisions_loaded' );
 		}
 	}
 
@@ -55,10 +55,7 @@ class GV_Entry_Revisions {
 
 		add_filter( 'gform_entry_meta', array( $this, 'modify_gform_entry_meta' ) );
 
-		// We only run the rest of the hooks on the entry detail page
-		if( 'entry_detail' === GFForms::get_page() ) {
-			$this->add_entry_detail_hooks();
-		}
+		$this->maybe_add_entry_detail_hooks();
 	}
 
 	/**
@@ -117,10 +114,16 @@ class GV_Entry_Revisions {
 	 *
 	 * @return void
 	 */
-	private function add_entry_detail_hooks() {
+	private function maybe_add_entry_detail_hooks() {
+
+		// We only run the rest of the hooks on the entry detail page
+		if( 'entry_detail' !== GFForms::get_page() ) {
+		    return;
+		}
+
 		add_filter( 'gform_entry_detail_meta_boxes', array( $this, 'add_meta_box' ) );
 
-		add_action( 'admin_init', array( $this, 'restore' ) );
+		add_action( 'admin_init', array( $this, 'admin_init_restore_listener' ) );
 
 		// If showing a revision, get rid of all metaboxes and lingering HTML stuff
 		if( isset( $_GET['revision'] ) ) {
@@ -244,6 +247,17 @@ class GV_Entry_Revisions {
 	}
 
 	/**
+     * Returns an entry revision by ID
+     *
+	 * @param int $revision_id
+	 *
+	 * @return array|WP_Error
+	 */
+	public function get_revision( $revision_id ) {
+		return GFAPI::get_entry( $revision_id );
+    }
+
+	/**
 	 * Get all revisions connected to an entry
 	 *
 	 * @since 1.0 
@@ -328,7 +342,7 @@ class GV_Entry_Revisions {
 
 		// Revision has already been deleted or does not exist
 		if( empty( $revision ) || is_wp_error( $revision ) ) {
-			return new WP_Error( 'not_found', __( 'Revision not found', 'gv-entry-revisions' ), array( 'entry_id' => $entry_id, 'revision_id' => $revision_id ) );
+			return new WP_Error( 'not_found', __( 'Revision not found', 'gravityview-entry-revisions' ), array( 'entry_id' => $entry_id, 'revision_id' => $revision_id ) );
 		}
 
 		$current_entry = GFAPI::get_entry( $entry_id );
@@ -336,7 +350,7 @@ class GV_Entry_Revisions {
 		/**
 		 * @param bool $restore_entry_meta Whether to restore entry meta as well as field values. Default: false
 		 */
-		if( false === apply_filters( 'gv-entry-revisions/restore-entry-meta', false ) ) {
+		if( false === apply_filters( 'gravityview/entry-revisions/restore-entry-meta', false ) ) {
 
 			// Override revision details with current entry details
 			foreach ( $current_entry as $key => $value ) {
@@ -441,13 +455,13 @@ class GV_Entry_Revisions {
 		if( ! empty( $revision_id )  ) {
 			$meta_boxes = array();
 			$meta_boxes[ self::$meta_key ] = array(
-				'title'    => 'Restore Entry Revision',
+				'title'    => esc_html__( 'Restore Entry Revision', 'gravityview-entry-revisions' ),
 				'callback' => array( $this, 'meta_box_restore_revision' ),
 				'context'  => 'normal',
 			);
 		} else {
 			$meta_boxes[ self::$meta_key ] = array(
-				'title'    => 'Entry Revisions',
+				'title'    => esc_html__( 'Entry Revisions', 'gravityview-entry-revisions' ),
 				'callback' => array( $this, 'meta_box_entry_revisions' ),
 				'context'  => 'normal',
 			);
@@ -493,9 +507,9 @@ class GV_Entry_Revisions {
 
 			$diff = wp_text_diff( $previous_value, $current_value, array(
 				'show_split_view' => 1,
-				'title' => sprintf( esc_html__( '%s (Field %s)', 'gv-entry-revisions' ), $label, $key ),
-				'title_left' => esc_html__( 'Entry Revision', 'gv-entry-revisions' ),
-				'title_right' => esc_html__( 'Current Entry', 'gv-entry-revisions' ),
+				'title' => sprintf( esc_html__( '%s (Field %s)', 'gravityview-entry-revisions' ), $label, $key ),
+				'title_left' => esc_html__( 'Entry Revision', 'gravityview-entry-revisions' ),
+				'title_right' => esc_html__( 'Current Entry', 'gravityview-entry-revisions' ),
 			) );
 
 			/**
@@ -524,23 +538,47 @@ class GV_Entry_Revisions {
 	public function meta_box_restore_revision( $data = array() ) {
 		
 		$entry = rgar( $data, 'entry' );
-		$form = rgar( $data, 'form' );
-		$revision = GFAPI::get_entry( rgget( 'revision') );
+		$revision = $this->get_revision( rgget( 'revision') );
+
+		if( is_wp_error( $revision ) ) {
+		    echo '<h3>' . esc_html__( 'This revision no longer exists.', 'gravityview-entry-revisions' ) . '</h3>';
+			?><a href="<?php echo esc_url( remove_query_arg( 'revision' ) ); ?>" class="button button-primary button-large"><?php esc_html_e( 'Return to Entry', 'gravityview-entry-revisions' ); ?></a><?php
+		    return;
+        }
+
+		$output = $this->get_diff_output( $entry, $revision );
+
+		if ( is_wp_error( $output ) ) {
+            return;
+		}
+
+		echo $output;
+		?>
+
+		<hr />
+
+		<p class="wp-clearfix">
+			<a href="<?php echo $this->get_restore_url( $revision ); ?>" class="button button-primary button-hero alignleft" onclick="return confirm('<?php esc_attr_e( 'Are you sure? The Current Entry data will be replaced with the Entry Revision data shown.' ) ?>');"><?php esc_html_e( 'Restore This Entry Revision' ); ?></a>
+			<a href="<?php echo esc_url( remove_query_arg( 'revision' ) ); ?>" class="button button-secondary button-hero alignright"><?php esc_html_e( 'Cancel: Keep Current Entry' ); ?></a>
+		</p>
+	<?php
+	}
+
+	private function get_diff_output( array $entry, array $revision ) {
 
 		$diff_output = '';
+		$form = GFAPI::get_form( $entry['form_id'] );
 		$diffs = $this->get_diff( $revision, $entry, $form );
 
 		if ( empty( $diffs ) ) {
-			echo '<h3>' . esc_html__( 'This revision is identical to the current entry.', 'gv-entry-revisions' ) . '</h3>';
-			?><a href="<?php echo esc_url( remove_query_arg( 'revision' ) ); ?>" class="button button-primary button-large"><?php esc_html_e( 'Return to Entry' ); ?></a><?php
-			return;
+		    return new WP_Error( 'not_found', esc_html__( 'This revision is identical to the current entry.', 'gravityview-entry-revisions' ) );
 		}
 
-		echo wpautop( $this->revision_title( $revision, false, 'The entry revision was created by %2$s, %3$s ago (%4$s).' ) );
+		$diff_output .= wpautop( $this->revision_title( $revision, false, esc_html__( 'The entry revision was created by %2$s, %3$s ago (%4$s).', 'gravityview-entry-revisions' ) ) );
 
-		echo '<hr />';
+		$diff_output .= '<hr />';
 
-		echo '<style>
+		$diff_output .= '<style>
 		table.diff {
 			margin-top: 1em;
 		}
@@ -566,17 +604,8 @@ class GV_Entry_Revisions {
 			$diff_output .= $diff;
 		}
 
-		echo $diff_output;
-		?>
-
-		<hr />
-
-		<p class="wp-clearfix">
-			<a href="<?php echo $this->get_restore_url( $revision ); ?>" class="button button-primary button-hero alignleft" onclick="return confirm('<?php esc_attr_e( 'Are you sure? The Current Entry data will be replaced with the Entry Revision data shown.' ) ?>');"><?php esc_html_e( 'Restore This Entry Revision' ); ?></a>
-			<a href="<?php echo esc_url( remove_query_arg( 'revision' ) ); ?>" class="button button-secondary button-hero alignright"><?php esc_html_e( 'Cancel: Keep Current Entry' ); ?></a>
-		</p>
-	<?php
-	}
+		return $diff_output;
+    }
 
 	/**
 	 * Generate a nonce action to secure the restoring process
@@ -678,7 +707,7 @@ class GV_Entry_Revisions {
 	       'container_css' => 'gv-entry-revisions',
            'wpautop'       => 1,
            'strings'       => array(
-	           'no_revisions' => __( 'This entry has no revisions.', 'gv-entry-revisions' ),
+	           'no_revisions' => __( 'This entry has no revisions.', 'gravityview-entry-revisions' ),
            )
         ));
 
@@ -720,7 +749,7 @@ class GV_Entry_Revisions {
 		/**
 		 * Modify the output of the revisions
 		 */
-		$output = apply_filters( 'gv-entry-revisions/output', $output, $entry );
+		$output = apply_filters( 'gravityview/entry-revisions/output', $output, $entry );
 
 		return $output;
     }
