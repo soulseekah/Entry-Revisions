@@ -604,7 +604,7 @@ class GV_Entry_Revisions {
 		$diffs = $this->get_diff( $revision, $entry, $form );
 
 		if ( empty( $diffs ) ) {
-		    return new WP_Error( 'not_found', esc_html__( 'This revision is identical to the current entry.', 'gravityview-entry-revisions' ) );
+		    return new WP_Error( 'identical', esc_html__( 'This revision is identical to the current entry.', 'gravityview-entry-revisions' ) );
 		}
 
 		$diff_output .= wpautop( $this->revision_title( $revision, false, esc_html__( 'The entry revision was created by %2$s, %3$s ago (%4$s).', 'gravityview-entry-revisions' ) ) );
