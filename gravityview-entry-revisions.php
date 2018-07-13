@@ -270,10 +270,11 @@ class GV_Entry_Revisions {
 	 * @since 1.0 
 	 * 
 	 * @param int $entry_id
+     * @param string $return "all" or "ids"
 	 *
 	 * @return array Empty array if none found. Array if found
 	 */
-	public function get_revisions( $entry_id = 0 ) {
+	public function get_revisions( $entry_id = 0, $return = 'all' ) {
 
 		$search_criteria = array(
 			'field_filters' => array(
@@ -284,8 +285,13 @@ class GV_Entry_Revisions {
 			)
 		);
 
-		// TODO: Add filter for page size
-		$revisions = GFAPI::get_entries( 0, $search_criteria, array(), array('offset' => 0, 'page_size' => 100 ) );
+
+        if( 'all' === $return ) {
+		    // TODO: Add filter for page size
+	        $revisions = GFAPI::get_entries( 0, $search_criteria, array(), array( 'offset' => 0, 'page_size' => 200 ) );
+        } else {
+	        $revisions = GFAPI::get_entry_ids( 0, $search_criteria, array(), array( 'offset' => 0, 'page_size' => 0 ) );
+        }
 
 		return $revisions;
 	}
@@ -318,7 +324,22 @@ class GV_Entry_Revisions {
 	 * @param int $entry_id ID of the entry to remove revsions
 	 */
 	private function delete_revisions( $entry_id = 0 ) {
-		gform_delete_meta( $entry_id, self::$meta_key );
+
+		$revision_ids = $this->get_revisions( $entry_id, 'ids' );
+
+		$deleted = array();
+		foreach ( $revision_ids as $revision_id ) {
+
+		    $success = GFAPI::delete_entry( $revision_id );
+
+			if ( is_wp_error( $success ) ) {
+                $deleted[ $revision_id ] = $success;
+			} else {
+				$deleted[ $revision_id ] = 1;
+            }
+		}
+
+		return $deleted;
 	}
 
 	/**
@@ -331,7 +352,7 @@ class GV_Entry_Revisions {
 	 *
 	 * return bool|WP_Error WP_Error if revision isn't found or submissions blocked; true if revision deleted
 	 */
-	private function delete_revision( $entry_id = 0, $revision_id = 0 ) {
+	private function delete_revision( $revision_id = 0 ) {
 		return GFAPI::delete_entry( $revision_id );
 	}
 
@@ -399,8 +420,8 @@ class GV_Entry_Revisions {
 			 * Should the revision be removed after it has been restored? Default: false
 			 * @param bool $remove_after_restore [Default: false]
 			 */
-			if( apply_filters( 'gv-entry-revisions/delete-after-restore', false ) ) {
-				return GFAPI::delete_entry( $revision_id );
+			if( apply_filters( 'gravityview/entry-revisions/delete-after-restore', false ) ) {
+				return $this->delete_revision( $revision_id );
 			}
 
 			return true;
