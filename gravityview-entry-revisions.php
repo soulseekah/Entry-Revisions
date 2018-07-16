@@ -287,7 +287,6 @@ class GV_Entry_Revisions {
 			)
 		);
 
-
         if( 'all' === $return ) {
 		    // TODO: Add filter for page size
 	        $revisions = GFAPI::get_entries( 0, $search_criteria, array(), array( 'offset' => 0, 'page_size' => 200 ) );
@@ -488,7 +487,7 @@ class GV_Entry_Revisions {
 		if( ! empty( $revision_id )  ) {
 			$meta_boxes = array();
 			$meta_boxes[ self::$meta_key ] = array(
-				'title'    => esc_html__( 'Restore Entry Revision', 'gravityview-entry-revisions' ),
+				'title'    => esc_html__( 'Entry Edit Changes', 'gravityview-entry-revisions' ),
 				'callback' => array( $this, 'meta_box_restore_revision' ),
 				'context'  => 'normal',
 			);
@@ -635,7 +634,7 @@ class GV_Entry_Revisions {
 		$revision = $this->get_revision( rgget( 'revision') );
 
 		if( is_wp_error( $revision ) ) {
-		    echo '<h3>' . esc_html__( 'This revision no longer exists.', 'gravityview-entry-revisions' ) . '</h3>';
+		    echo '<h3>' . esc_html__( 'This update no longer exists.', 'gravityview-entry-revisions' ) . '</h3>';
 			?><a href="<?php echo esc_url( remove_query_arg( 'revision' ) ); ?>" class="button button-primary button-large"><?php esc_html_e( 'Return to Entry', 'gravityview-entry-revisions' ); ?></a><?php
 		    return;
         }
@@ -655,25 +654,40 @@ class GV_Entry_Revisions {
 		$form = GFAPI::get_form( $entry['form_id'] );
 		$diff = $this->get_diff( $revision, $entry, $form, true );
 
-		if ( empty( $diffs ) ) {
-		    return new WP_Error( 'identical', esc_html__( 'This revision is identical to the current entry.', 'gravityview-entry-revisions' ) );
+		if ( empty( $diff ) ) {
+		    return new WP_Error( 'identical', esc_html__( 'This update is identical to the current entry.', 'gravityview-entry-revisions' ) );
 		}
 
 		$diff_output .= '<style>
 		table.diff {
-			margin-top: 1em;
+			margin: 1em 0 2em;
+			border-spacing: 10px;
 		}
-		table.diff .diff-title th {
+		table.diff caption {
+			font-size: 16px;
+			padding: 1em 10%;
 			font-weight: normal;
-			text-transform: uppercase;
+			color: #333;
+			line-height: 1.4;
 		}
-		table.diff .diff-title th {
-			font-size: 18px;
-			padding-top: 10px;
+		table.diff tfoot td {
+		    padding: 0;
+		}
+		table.diff tfoot td,
+		table.diff th {
+		    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+		} 
+		.diff-row-details {
+		    display: block;
+		    font-weight: normal;
+		    font-size: 12px;
+		}
+		table.diff tbody th {
+		    text-align: right;
 		}
 		table.diff .diff-deletedline { 
 			background-color: #edf3ff;
-			 border:  1px solid #dcdcdc;
+			border:  1px solid #dcdcdc;
 		}
 		table.diff .diff-addedline { 
 			background-color: #f7fff7; 
@@ -829,6 +843,7 @@ class GV_Entry_Revisions {
 		    $form = GFAPI::get_form( $entry['form_id'] );
 
 		    $revisions     = $this->get_revisions( $entry_id );
+
 		    $container_css = esc_attr( $atts['container_css'] );
 
 		    if ( empty( $revisions ) ) {
