@@ -659,9 +659,13 @@ class GV_Entry_Revisions {
 	 *
 	 * @param array $revision Revision entry array
 	 *
-	 * @return string
+	 * @return string|WP_Error
 	 */
 	private function get_restore_url( $revision = array() ) {
+
+		if ( empty( $revision ) ) {
+            return new WP_Error( 'not_found', 'The revision was not found; could not create restore URL' );
+		}
 
 		$nonce_action = $this->generate_restore_nonce_action( $revision['gv_revision_parent_id'], $revision['id'] );
 
