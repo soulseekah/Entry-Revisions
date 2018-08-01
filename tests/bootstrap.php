@@ -3,7 +3,7 @@ ini_set( 'display_errors', 'on' );
 error_reporting( E_ALL );
 
 $_wp_tests_dir = getenv( 'WP_TESTS_DIR' ) ? : '/tmp/wordpress-tests-lib';
-$_gf_plugin_dir = getenv( 'GF_PLUGIN_DIR' ) ? : '/tmp/gravityview';
+$_gf_plugin_dir = getenv( 'GF_PLUGIN_DIR' ) ? : '/tmp/gravityforms';
 $_gv_revisions_tests_dir = __DIR__;
 
 // Load test function so tests_add_filter() is available.
@@ -18,13 +18,6 @@ tests_add_filter( 'muplugins_loaded', function() use ( $_gf_plugin_dir, $_gv_rev
 		gf_upgrade()->maybe_upgrade();
 	} else {
 		GFForms::setup( true );
-	}
-
-	if ( ! getenv( 'WP_SKIP_INSTALL' ) ) {
-		// Clean up the GF Database when we're done.
-		register_shutdown_function( function() {
-			RGFormsModel::drop_tables();
-		} );
 	}
 
 	// Include test harnesses.
